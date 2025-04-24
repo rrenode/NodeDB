@@ -1,0 +1,141 @@
+# utils.py
+
+import re
+from typing import Any, Dict
+
+class AutoPropertiesMeta(type):
+    def __new__(cls, name, bases, dct):
+        # For every annotated field, pull off any class‐level default
+        # and install a private backing field + a public property
+        annotations = dct.get("__annotations__", {})
+        for attr in annotations:
+            default = dct.pop(attr, None)
+            dct[f"_{attr}"] = default
+            dct[attr] = property(
+                lambda self, attr=attr: getattr(self, f"_{attr}", None),
+                lambda self, value, attr=attr: setattr(self, f"_{attr}", value)
+            )
+        return super().__new__(cls, name, bases, dct)
+
+
+class OldVariableNamesMeta(AutoPropertiesMeta):
+    def __new__(cls, name, bases, dct):
+        original_init = dct.get("__init__")
+        old_map = dct.get("__old_mappings__", {})
+
+        # 1) Wrap __init__ to remap old-kwargs → new-attrs on construction
+        def new_init(self, *args, **kwargs):
+            extra: Dict[str, Any] = {}
+            for old, new in old_map.items():
+                if old in kwargs:
+                    extra[new] = kwargs.pop(old)
+
+            if original_init:
+                original_init(self, *args, **kwargs)
+            else:
+                for base in bases:
+                    bi = getattr(base, "__init__", None)
+                    if bi:
+                        bi(self, *args, **kwargs)
+                        break
+
+            for new, val in extra.items():
+                setattr(self, new, val)
+
+        dct["__init__"] = new_init
+
+        # 2) Install proxy properties so .old_name ↔ .new_name
+        def make_proxy(old, new):
+            return property(
+                lambda self: getattr(self, new),
+                lambda self, v: setattr(self, new, v)
+            )
+        for old, new in old_map.items():
+            dct[old] = make_proxy(old, new)
+
+        # 3) Ensure pickle/jsonpickle will call your __getstate__/__setstate__
+        #    by overriding __reduce__ to return (cls, (), state_dict)
+        #def __reduce__(self):
+        #    return (self.__class__, (), self.__getstate__())
+        #dct["__reduce__"] = __reduce__
+
+        return super().__new__(cls, name, bases, dct)
+
+def handle_old_variable_names(cls):
+    original_init = cls.__init__
+
+    def new_init(self, *args, **kwargs):
+        # Apply old-to-new variable name mapping during instantiation
+        old_mappings = getattr(cls, "__old_mappings__", {})
+        for old_attr, new_attr in old_mappings.items():
+            if old_attr in kwargs:
+                kwargs[new_attr] = kwargs.pop(old_attr)  # Remap old attribute to new one
+        original_init(self, *args, **kwargs)
+
+    cls.__init__ = new_init
+
+    # Add property behavior for the old variable names to point to the new ones
+    def add_old_name_property(attr, new_attr):
+        def getter(self):
+            return getattr(self, new_attr, None)  # Return the value of the new attribute
+
+        def setter(self, value):
+            setattr(self, new_attr, value)  # Set the value for the new attribute
+
+        return property(getter, setter)
+
+    # Check for old mappings and add properties for them
+    old_mappings = getattr(cls, "__old_mappings__", {})
+    for old_attr, new_attr in old_mappings.items():
+        setattr(cls, old_attr, add_old_name_property(old_attr, new_attr))
+
+    return cls
+
+def auto_properties(cls):
+    # Loop through the class annotations to get the attributes
+    for attr, value in cls.__annotations__.items():
+        # Skip special methods and private attributes
+        if not hasattr(cls, attr):  # If the attribute is not already defined as a method or other property
+            # Create a private attribute and define the property
+            setattr(cls, f"_{attr}", None)  # Initialize a private attribute
+            
+            # Create getter and setter
+            setattr(cls, attr, property(
+                lambda self, attr=attr: getattr(self, f"_{attr}", None),  # Getter
+                lambda self, value, attr=attr: setattr(self, f"_{attr}", value)  # Setter
+            ))
+
+    return cls
+
+def generate_name_alias(name: str, min_length:int = 3, max_length: int = 3, forced_length: int = 0) -> str:
+    """
+    Generates a short alias from a given name by using the initials and truncating it to the desired length.
+    
+    Args:
+        name (str): The original name (e.g., "todo_app").
+        min_length (int): The minimum length of the alias (default is 3 characters).
+        max_length (int): The maximum length of the alias (default is 3 characters).
+        forced_length (int): Unused.
+    
+    Returns:
+        str: The generated alias.
+    """
+    # Clean the name and split
+    name = name.lower()
+    underscore_words = []
+    space_words = []
+    if '_' in name:
+        underscore_words = name.split('_')
+    if ' ' in name:
+        space_words = name.split(' ')
+    
+    words = underscore_words + space_words
+
+    alias = ''.join([word[0] for word in words])
+
+    if len(alias) < min_length:
+        for word in words:
+            if len(alias) < min_length:
+                alias += word[1:3]
+        
+    return alias
