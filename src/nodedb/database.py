@@ -10,14 +10,20 @@ from .utils import OldVariableNamesMeta, generate_name_alias
 class BaseModel(metaclass=OldVariableNamesMeta):
     def __getstate__(self) -> Dict[str, Any]:
         """
-        When jsonpickle pickles us, only export the public names
-        (so we never leak private _foo fields).
+        When jsonpickle pickles us, export all public names from the class and its ancestors.
         """
         state: Dict[str, Any] = {}
-        anns = getattr(self.__class__, "__annotations__", {})
-        for public in anns:
-            state[public] = getattr(self, public)
+        annotations: Dict[str, Any] = {}
+        
+        # Walk MRO to include inherited fields
+        for cls in self.__class__.__mro__:
+            annotations.update(getattr(cls, "__annotations__", {}))
+        
+        for public in annotations:
+            state[public] = getattr(self, public, None)
+        
         return state
+
 
     def __setstate__(self, state: Dict[str, Any]):
         """

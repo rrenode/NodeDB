@@ -120,22 +120,22 @@ def generate_name_alias(name: str, min_length:int = 3, max_length: int = 3, forc
     Returns:
         str: The generated alias.
     """
-    # Clean the name and split
     name = name.lower()
-    underscore_words = []
-    space_words = []
     if '_' in name:
-        underscore_words = name.split('_')
-    if ' ' in name:
-        space_words = name.split(' ')
-    
-    words = underscore_words + space_words
+        words = name.split('_')
+    elif ' ' in name:
+        words = name.split(' ')
+    else:
+        words = [name]  # fallback if no separators
 
-    alias = ''.join([word[0] for word in words])
+    alias = ''.join([word[0] for word in words if word])
 
+    # If alias is too short, continue adding more letters from words
     if len(alias) < min_length:
         for word in words:
-            if len(alias) < min_length:
-                alias += word[1:3]
-        
-    return alias
+            i = 1  # start after first letter
+            while len(alias) < min_length and i < len(word):
+                alias += word[i]
+                i += 1
+
+    return alias[:max_length]  # cut off at max_length
