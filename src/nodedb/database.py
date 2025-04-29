@@ -148,6 +148,24 @@ class Graph(BaseModel):
 
         return best_match
 
+    def match_closest_node_id(self, node_id: str) -> Optional[Node]:
+        # First check for exact match
+        for node in self.nodes:
+            if node_id == node.id:
+                return node
+
+        # Otherwise, find the node with the highest similarity
+        best_match = None
+        highest_similarity = 0
+
+        for node in self.nodes:
+            similarity = difflib.SequenceMatcher(None, node_id, node.id).ratio()
+            if similarity > highest_similarity:
+                highest_similarity = similarity
+                best_match = node
+
+        return best_match        
+
     def get_parent(self, node_id: str | UUID) -> Optional[Node]:
         node = self.get_node_by_id(node_id)
         return node.parent if node else None
