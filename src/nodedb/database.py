@@ -5,7 +5,7 @@ from uuid import uuid4, UUID
 from pathlib import Path
 import jsonpickle
 
-from .utils import OldVariableNamesMeta
+from .utils import OldVariableNamesMeta, generate_name_alias
 
 class BaseModel(metaclass=OldVariableNamesMeta):
     def __getstate__(self) -> Dict[str, Any]:
