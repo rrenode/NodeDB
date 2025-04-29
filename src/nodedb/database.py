@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 from uuid import uuid4, UUID
 from pathlib import Path
 import jsonpickle
+import difflib
 
 from .utils import OldVariableNamesMeta, generate_name_alias
 
@@ -107,6 +108,45 @@ class Graph(BaseModel):
             if str(node.id) == node_id:
                 return node
         return None
+    
+    def get_node_by_alias(self, node_alias: str) -> Optional[Node]:
+        for node in self.nodes:
+            if str(node.alias) == node_alias:
+                return node
+        return None
+    
+    def get_node_by_name(self, node_name: str) -> Optional[Node]:
+        for node in self.nodes:
+            if node_name == node.name:
+                return node
+        return None
+    
+    def get_closest_nodes_name(self, node_name: str) -> Optional[Node]:
+        possible_nodes = []
+        for node in self.nodes:
+            if node_name in node.name:
+                possible_nodes.append(node)
+            if node_name == node.name:
+                return node
+        return possible_nodes
+        
+    def match_closest_node_name(self, node_name: str) -> Optional[Node]:
+        # First check for exact match
+        for node in self.nodes:
+            if node_name == node.name:
+                return node
+
+        # Otherwise, find the node with the highest similarity
+        best_match = None
+        highest_similarity = 0
+
+        for node in self.nodes:
+            similarity = difflib.SequenceMatcher(None, node_name, node.name).ratio()
+            if similarity > highest_similarity:
+                highest_similarity = similarity
+                best_match = node
+
+        return best_match
 
     def get_parent(self, node_id: str | UUID) -> Optional[Node]:
         node = self.get_node_by_id(node_id)
