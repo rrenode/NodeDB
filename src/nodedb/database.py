@@ -77,6 +77,19 @@ class Node(BaseModel):
         else:
             _id = uuid4()
         self.id = _id
+    
+    def as_dict(self):
+        return {
+            k: (v.id if isinstance(v, Node) and k == 'parent' else v)
+            for k, v in self.__dict__.items()
+            if not k.startswith('_')
+        }
+
+    def as_csv(self):
+        return list(self.as_dict().values())
+
+    def csv_headers(self):
+        return list(self.as_dict().keys())
 
 class Repo(Node):
     path: Path
@@ -90,7 +103,7 @@ class Repo(Node):
             "alias": self.alias,
             "id": self.id,
             "node_type": self.node_type,
-            "parent": self.parent,
+            "parent": self.parent.id if self.parent else None,
             "edges": self.edges,
             "path": self.path,
             "sympath": self.sympath
@@ -198,6 +211,17 @@ class Graph(BaseModel):
         print("\nGraph Edges:")
         for edge in self.edges:
             print(f"  - {edge.node_a.alias} --[{edge.name}]--> {edge.node_b.alias}")
+    
+    def csv_nodes(self) -> list[list]:
+        header = []
+        csv = []
+        
+        for node in self.nodes:
+            if not header:
+                header = node.csv_headers()
+            csv.append(node.as_csv())
+        
+        return csv, header
     
     def save(self, filepath: str):
         with open(filepath, "w") as f:
