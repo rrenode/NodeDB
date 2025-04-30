@@ -81,9 +81,20 @@ class Node(BaseModel):
 class Repo(Node):
     path: Path
     sympath: Path
-    tests: str
     
-    __old_mappings__ = {'test':'tests'}
+    #__old_mappings__ = {'test':'tests'}
+    
+    def as_dict(self):
+        return {
+            "name": self.name,
+            "alias": self.alias,
+            "id": self.id,
+            "node_type": self.node_type,
+            "parent": self.parent,
+            "edges": self.edges,
+            "path": self.path,
+            "sympath": self.sympath
+        }
 
 class Project(Node):
     repos: list[Repo]
