@@ -145,6 +145,32 @@ class Graph(BaseModel):
                 return node
         return None
     
+    def get_closest_nodes_alias(self, alias: str) -> Optional[Node]:
+        possible_nodes = []
+        for node in self.nodes:
+            if alias in node.alias:
+                possible_nodes.append(node)
+            if alias == node.alias:
+                return node
+        return possible_nodes
+    
+    def match_closest_node_alias(self, alias: str) -> Optional[Node]:
+        possible_node = self.get_closest_nodes_alias(alias)
+        if isinstance(possible_node, Node):
+            if possible_node.alias == alias:
+                return possible_node
+    
+        best_match = None
+        highest_similarity = 0
+        
+        for node in self.nodes:
+            similarity = difflib.SequenceMatcher(None, alias, node.alias).ratio()
+            if similarity > highest_similarity:
+                highest_similarity = similarity
+                best_match = node
+
+        return best_match
+    
     def get_closest_nodes_name(self, node_name: str) -> Optional[Node]:
         possible_nodes = []
         for node in self.nodes:
@@ -188,7 +214,7 @@ class Graph(BaseModel):
                 highest_similarity = similarity
                 best_match = node
 
-        return best_match        
+        return best_match
 
     def get_parent(self, node_id: str | UUID) -> Optional[Node]:
         node = self.get_node_by_id(node_id)
