@@ -25,7 +25,6 @@ class BaseModel(metaclass=OldVariableNamesMeta):
         
         return state
 
-
     def __setstate__(self, state: Dict[str, Any]):
         """
         When jsonpickle rehydrates us:
