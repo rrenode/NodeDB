@@ -229,6 +229,13 @@ class Graph(BaseModel):
     def get_edges_to(self, node: Node) -> list[Edge]:
         return [e for e in self.edges if e.node_b == node]
 
+    def remove_node(self, node: Node):
+        # Remove edges connected to the node
+        self.edges = [e for e in self.edges if e.node_a != node and e.node_b != node]
+        
+        # Remove the node itself
+        self.nodes = [n for n in self.nodes if n != node]
+
     def print_graph(self):
         print("Graph Nodes:")
         for node in self.nodes:
