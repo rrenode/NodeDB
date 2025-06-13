@@ -90,6 +90,9 @@ class Node(BaseModel):
     def csv_headers(self):
         return list(self.as_dict().keys())
 
+class EditorChoice(Enum):
+    VS = 1
+    VSCODE = 2
 class Repo(Node):
     path: Path
     sympath: Path
@@ -198,15 +201,20 @@ class Graph(BaseModel):
         return best_match
 
     def match_closest_node_id(self, node_id: str) -> Optional[Node]:
-        # First check for exact match
+        # Exact match
         for node in self.nodes:
-            if node_id == node.id:
+            if node.id == node_id:
                 return node
 
-        # Otherwise, find the node with the highest similarity
+        # Prefix match
+        prefix_matches = [node for node in self.nodes if node.id.startswith(node_id)]
+        if prefix_matches:
+            # If multiple, return shortest match
+            return min(prefix_matches, key=lambda n: len(n.id))
+
+        # Fuzzy fallback (optional, or skip)
         best_match = None
         highest_similarity = 0
-
         for node in self.nodes:
             similarity = difflib.SequenceMatcher(None, node_id, node.id).ratio()
             if similarity > highest_similarity:
