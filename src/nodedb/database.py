@@ -262,12 +262,16 @@ class Graph(BaseModel):
             [n for n in self.nodes if regex.search(str(getattr(n, field, "")))]
         )
 
-    def sort_nodes_by(self, field: str) -> tuple[list[list], list[str]]:
+    def sort_nodes_by(
+        self, field: str, limit: int = None, offset: int = 0
+    ) -> tuple[list[list], list[str]]:
         if not all(hasattr(n, field) for n in self.nodes):
             raise AttributeError(f"Field '{field}' not found in Node")
-        return self._nodes_to_csv(
-            sorted(self.nodes, key=lambda n: getattr(n, field, ""))
-        )
+
+        sorted_nodes = sorted(self.nodes, key=lambda n: getattr(n, field, ""))
+        paged_nodes = sorted_nodes[offset: offset + limit if limit is not None else None]
+
+        return self._nodes_to_csv(paged_nodes)
 
     # ─────────────────────────────────────────────
     # Exporting / Serialization
