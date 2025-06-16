@@ -1,6 +1,4 @@
 # utils.py
-
-import re
 from typing import Any, Dict
 
 class AutoPropertiesMeta(type):
