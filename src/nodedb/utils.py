@@ -1,5 +1,10 @@
 # utils.py
-from typing import Any, Dict
+import gc
+import sys
+import inspect
+
+from typing import Any, Dict, Type
+from functools import lru_cache
 
 class AutoPropertiesMeta(type):
     def __new__(cls, name, bases, dct):
@@ -137,3 +142,96 @@ def generate_name_alias(name: str, min_length:int = 3, max_length: int = 3, forc
                 i += 1
 
     return alias[:max_length]  # cut off at max_length
+
+def recurse_json(obj, callback):
+    """
+    Recursively walk a JSON-like structure, applying `callback` to every dict.
+    """
+    if isinstance(obj, dict):
+        result = callback(obj)
+
+        # If callback changed the object to something non-dict, stop recursion
+        if not isinstance(result, dict):
+            return result
+
+        for key in list(result.keys()):
+            result[key] = recurse_json(result[key], callback)
+        return result
+
+    elif isinstance(obj, list):
+        return [recurse_json(item, callback) for item in obj]
+
+    else:
+        # Primitive (str, int, None, etc.) – return as-is
+        return obj
+
+def get_all_loaded_classes(clear_cache=False):
+    if clear_cache:
+        __get_all_loaded_classes__.cache_clear()
+    return __get_all_loaded_classes__
+
+@lru_cache(1)
+def __get_all_loaded_classes__():
+    return [obj for obj in gc.get_objects() if isinstance(obj, type)]
+
+def get_all_classes_from_specific_loaded_module(module_namespace:str, clear_cache=False):
+    """
+    Filters loaded classes from modules that start with a given namespace (e.g., 'userlib').
+    Returns a dict in the format {cls_import_path: cls_obj}.
+    Interface for a function with a simialar name for easy cache clear.
+    """
+    if clear_cache:
+        __get_all_classes_from_specific_loaded_module__.cache_clear()
+    return __get_all_classes_from_specific_loaded_module__(module_namespace)
+
+@lru_cache(1)
+def __get_all_classes_from_specific_loaded_module__(module_namespace: str, clear_cache: bool = False):
+    """
+    Filters loaded classes from modules that start with a given namespace (e.g., 'userlib').
+    Returns a dict in the format {cls_import_path: cls_obj}.
+    """
+    all_classes = get_all_classes_from_loaded_modules(clear_cache=clear_cache)
+
+    return {
+        path: cls
+        for path, cls in all_classes.items()
+        if cls.__module__.startswith(module_namespace)
+    }
+
+def get_all_classes_from_loaded_modules(clear_cache=False):
+    """Gets all classes and returns a dict in the format {cls_import_path:cls_obj}
+    Interface for a function with a simialar name for easy cache clear.
+    """
+    if clear_cache:
+        __get_all_classes_from_loaded_modules__.cache_clear()
+    return __get_all_classes_from_loaded_modules__()
+
+@lru_cache(maxsize=1)
+def __get_all_classes_from_loaded_modules__():
+    """Gets all classes and returns a dict in the format {cls_import_path:cls_obj}
+    Uses lru_cache with max_size = 1.
+    Use cache_clear to force a clear.
+    """
+    classes = {}
+    for module in list(sys.modules.values()):
+        if module and hasattr(module, "__dict__"):
+            for name, obj in module.__dict__.items():
+                if inspect.isclass(obj):
+                    full_path = f"{obj.__module__}.{obj.__qualname__}"
+                    classes[full_path] = obj
+    return classes
+
+def get_all_subclasses_of(base_cls: Type) -> Dict[str, Type]:
+    """
+    Returns a dictionary of {full_class_path: class_obj}
+    for all currently loaded classes that inherit from `base_cls`.
+    """
+    from . import get_all_classes_from_loaded_modules  # if inside utils.py
+
+    all_classes = get_all_classes_from_loaded_modules()
+
+    return {
+        path: cls
+        for path, cls in all_classes.items()
+        if inspect.isclass(cls) and issubclass(cls, base_cls) and cls is not base_cls
+    }
