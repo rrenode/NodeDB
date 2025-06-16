@@ -245,6 +245,8 @@ class Graph(BaseModel):
     # ─────────────────────────────────────────────
 
     def filter_nodes_by_field(self, field: str, value: Any) -> tuple[list[list], list[str]]:
+        if not all(hasattr(n, field) for n in self.nodes):
+            raise AttributeError(f"Field '{field}' not found in Node")
         return self._nodes_to_csv(
             [n for n in self.nodes if getattr(n, field, None) == value]
         )
@@ -261,6 +263,8 @@ class Graph(BaseModel):
         )
 
     def sort_nodes_by(self, field: str) -> tuple[list[list], list[str]]:
+        if not all(hasattr(n, field) for n in self.nodes):
+            raise AttributeError(f"Field '{field}' not found in Node")
         return self._nodes_to_csv(
             sorted(self.nodes, key=lambda n: getattr(n, field, ""))
         )
