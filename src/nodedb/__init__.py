@@ -17,3 +17,4 @@ finally:
 
 from .database import *
 from .utils import *
+from .logger import setup_loguru_logging
