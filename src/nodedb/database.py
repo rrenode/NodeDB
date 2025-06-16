@@ -1,94 +1,14 @@
 # database.py
 import re
-from enum import Enum
-from typing import Any, Dict, Optional, Callable
-from uuid import uuid4, UUID
-from pathlib import Path
-import jsonpickle
 import difflib
+import jsonpickle
 
-from .utils import OldVariableNamesMeta, generate_name_alias
+from typing import Any, Optional, Callable
+from pathlib import Path
+from uuid import UUID
 
-class BaseModel(metaclass=OldVariableNamesMeta):
-    def __getstate__(self) -> Dict[str, Any]:
-        """
-        When jsonpickle pickles us, export all public names from the class and its ancestors.
-        """
-        state: Dict[str, Any] = {}
-        annotations: Dict[str, Any] = {}
-        
-        # Walk MRO to include inherited fields
-        for cls in self.__class__.__mro__:
-            annotations.update(getattr(cls, "__annotations__", {}))
-        
-        for public in annotations:
-            state[public] = getattr(self, public, None)
-        
-        return state
-
-    def __setstate__(self, state: Dict[str, Any]):
-        """
-        When jsonpickle rehydrates us:
-        1. Rename any old → new keys
-        2. Assign via setattr so the AutoPropertiesMeta
-           setters populate the private backing fields.
-        """
-        old_map = getattr(self.__class__, "__old_mappings__", {})
-        for old, new in old_map.items():
-            if old in state:
-                state[new] = state.pop(old)
-
-        for public, val in state.items():
-            setattr(self, public, val)
-
-class Edge(BaseModel):
-    name: str
-    node_b: 'Node'
-    node_a: 'Node'
-    
-    def __init__(self, name, node_a, node_b):
-        self.name = name
-        self.node_a = node_a
-        self.node_b = node_b
-
-class NodeType(Enum):
-    UNDEFINED = 0
-
-class Node(BaseModel):
-    name: str = ""
-    alias: str = ""
-    node_type: Optional[NodeType] = None
-    parent: 'Node' = None
-    id: uuid4 = None
-    edges: list[Edge] = None
-    
-    def __init__(self, name:str, alias:str=None, id: str | UUID=None):
-        self.name = name
-        
-        _alias = alias
-        if not _alias:
-            _alias = generate_name_alias(name)
-        self.alias = _alias
-        
-        _id = id
-        if id and isinstance(id,str):
-            UUID(id)
-        else:
-            _id = uuid4()
-        self.id = _id
-    
-    def as_dict(self):
-        return {
-            k: (v.id if isinstance(v, Node) and k == 'parent' else v)
-            for k, v in self.__dict__.items()
-            if not k.startswith('_')
-        }
-
-    def as_csv(self):
-        return list(self.as_dict().values())
-
-    def csv_headers(self):
-        return list(self.as_dict().keys())
+from .base_models import Node, Edge, BaseModel
+from .jpickle_ex import deserialize_phase2, serialize_phase2
 
 class Graph(BaseModel):
     nodes: list[Node]
@@ -288,6 +208,8 @@ class Graph(BaseModel):
         return self._nodes_to_csv(self.nodes)
 
     def save(self, filepath: str | Path) -> None:
+        from json import loads, dumps
+
         filepath = Path(filepath)
 
         # Prevent writing to a directory
@@ -297,21 +219,38 @@ class Graph(BaseModel):
         # Ensure parent directories exist
         filepath.parent.mkdir(parents=True, exist_ok=True)
 
-        # Encode graph
-        data = jsonpickle.encode(self, make_refs=False)
+        # Encode graph -> JSON string with refs
+        raw_json_str = jsonpickle.encode(self, make_refs=True)
 
         # Defensive check
-        if not data or data.strip() == "{}":
+        if not raw_json_str or raw_json_str.strip() == "{}":
             raise ValueError("Refusing to save empty or malformed graph data")
 
-        # Write to file
-        filepath.write_text(data)
+        # Convert to dict for phase2 transform
+        data_dict = loads(raw_json_str)
+        transformed_data = serialize_phase2(data_dict)
+
+        # Write final JSON string to file
+        filepath.write_text(dumps(transformed_data, indent=2))
     
     @staticmethod
-    def load(filepath: str) -> 'Graph':
-        with open(filepath, "r") as f:
-            decoded = jsonpickle.decode(f.read())
-        return decoded
+    def load(filepath: Path, type_overrides: dict[str, str] = {}) -> 'Graph':
+        from json import loads, dumps
+
+        if isinstance(filepath, str):
+            filepath = Path(filepath)
+
+        # Read file as JSON dict
+        raw_data = loads(filepath.read_text())
+
+        # Reverse the phase2 transformation
+        deserialized_data = deserialize_phase2(raw_data, type_overrides=type_overrides)
+
+        # Convert dict back to string → decode with jsonpickle
+        obj = jsonpickle.decode(dumps(deserialized_data))
+        
+        return obj
+
     
     # ─────────────────────────────────────────────
     # Debug / Introspection
