@@ -51,8 +51,7 @@ class Edge(BaseModel):
         self.node_b = node_b
 
 class NodeType(Enum):
-    REPO = 1
-    PROJECT = 2
+    UNDEFINED = 0
 
 class Node(BaseModel):
     name: str = ""
@@ -89,30 +88,6 @@ class Node(BaseModel):
 
     def csv_headers(self):
         return list(self.as_dict().keys())
-
-class EditorChoice(Enum):
-    VS = 1
-    VSCODE = 2
-class Repo(Node):
-    path: Path
-    sympath: Path
-    
-    #__old_mappings__ = {'test':'tests'}
-    
-    def as_dict(self):
-        return {
-            "name": self.name,
-            "alias": self.alias,
-            "id": self.id,
-            "node_type": self.node_type,
-            "parent": self.parent.id if self.parent else None,
-            "edges": self.edges,
-            "path": self.path,
-            "sympath": self.sympath
-        }
-
-class Project(Node):
-    repos: list[Repo]
 
 class Graph(BaseModel):
     nodes: list[Node]
