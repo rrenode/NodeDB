@@ -1,6 +1,7 @@
 # database.py
+import re
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Callable
 from uuid import uuid4, UUID
 from pathlib import Path
 import jsonpickle
@@ -93,15 +94,34 @@ class Graph(BaseModel):
     nodes: list[Node]
     edges: list[Edge]
     
+    # ─────────────────────────────────────────────
+    # Initialization
+    # ─────────────────────────────────────────────
+    
     def __init__(self):
         self.nodes: list[Node] = []
         self.edges: list[Edge] = []
+
+    # ─────────────────────────────────────────────
+    # Node & Edge Management
+    # ─────────────────────────────────────────────
 
     def add_node(self, node: Node):
         self.nodes.append(node)
 
     def add_edge(self, edge: Edge):
         self.edges.append(edge)
+    
+    def remove_node(self, node: Node):
+        # Remove edges connected to the node
+        self.edges = [e for e in self.edges if e.node_a != node and e.node_b != node]
+        
+        # Remove the node itself
+        self.nodes = [n for n in self.nodes if n != node]
+
+    # ─────────────────────────────────────────────
+    # Lookup by Identity
+    # ─────────────────────────────────────────────
 
     def get_node_by_id(self, node_id: str | UUID) -> Optional[Node]:
         node_id = str(node_id)
@@ -121,6 +141,10 @@ class Graph(BaseModel):
             if node_name == node.name:
                 return node
         return None
+    
+    # ─────────────────────────────────────────────
+    # Fuzzy / Closest Matching
+    # ─────────────────────────────────────────────
     
     def get_closest_nodes_alias(self, alias: str) -> Optional[Node]:
         possible_nodes = []
@@ -198,47 +222,64 @@ class Graph(BaseModel):
 
         return best_match
 
+    # ─────────────────────────────────────────────
+    # Graph Relationships
+    # ─────────────────────────────────────────────
+
     def get_parent(self, node_id: str | UUID) -> Optional[Node]:
         node = self.get_node_by_id(node_id)
         return node.parent if node else None
 
     def get_children(self, parent_node: Node) -> list[Node]:
         return [n for n in self.nodes if n.parent == parent_node]
-
+    
     def get_edges_from(self, node: Node) -> list[Edge]:
         return [e for e in self.edges if e.node_a == node]
 
     def get_edges_to(self, node: Node) -> list[Edge]:
         return [e for e in self.edges if e.node_b == node]
 
-    def remove_node(self, node: Node):
-        # Remove edges connected to the node
-        self.edges = [e for e in self.edges if e.node_a != node and e.node_b != node]
-        
-        # Remove the node itself
-        self.nodes = [n for n in self.nodes if n != node]
 
-    def print_graph(self):
-        print("Graph Nodes:")
-        for node in self.nodes:
-            print(f"  - {node.name} ({node.alias}) [{node.id}]")
+    # ─────────────────────────────────────────────
+    # Filtering / Querying
+    # ─────────────────────────────────────────────
 
-        print("\nGraph Edges:")
-        for edge in self.edges:
-            print(f"  - {edge.node_a.alias} --[{edge.name}]--> {edge.node_b.alias}")
-    
-    def csv_nodes(self) -> list[list]:
-        header = []
-        csv = []
-        
-        for node in self.nodes:
-            if not header:
-                header = node.csv_headers()
-            csv.append(node.as_csv())
-        
-        return csv, header
-    
-    def save(self, filepath: str):
+    def filter_nodes_by_field(self, field: str, value: Any) -> tuple[list[list], list[str]]:
+        return self._nodes_to_csv(
+            [n for n in self.nodes if getattr(n, field, None) == value]
+        )
+
+    def find_nodes(self, fn: Callable[['Node'], bool]) -> tuple[list[list], list[str]]:
+        return self._nodes_to_csv(
+            [n for n in self.nodes if fn(n)]
+        )
+
+    def find_nodes_by_regex(self, field: str, pattern: str) -> tuple[list[list], list[str]]:
+        regex = re.compile(pattern)
+        return self._nodes_to_csv(
+            [n for n in self.nodes if regex.search(str(getattr(n, field, "")))]
+        )
+
+    def sort_nodes_by(self, field: str) -> tuple[list[list], list[str]]:
+        return self._nodes_to_csv(
+            sorted(self.nodes, key=lambda n: getattr(n, field, ""))
+        )
+
+    # ─────────────────────────────────────────────
+    # Exporting / Serialization
+    # ─────────────────────────────────────────────
+
+    def _nodes_to_csv(self, nodes: list['Node']) -> tuple[list[list], list[str]]:
+        if not nodes:
+            return [], []
+        header = nodes[0].csv_headers()
+        data = [n.as_csv() for n in nodes]
+        return data, header
+
+    def csv_nodes(self) -> tuple[list[list], list[str]]:
+        return self._nodes_to_csv(self.nodes)
+
+    def save(self, filepath: str) -> None:
         with open(filepath, "w") as f:
             f.write(jsonpickle.encode(self))
     
@@ -247,3 +288,17 @@ class Graph(BaseModel):
         with open(filepath, "r") as f:
             decoded = jsonpickle.decode(f.read())
         return decoded
+    
+    # ─────────────────────────────────────────────
+    # Debug / Introspection
+    # ─────────────────────────────────────────────
+    
+    def print_graph(self) -> None:
+        """MOSTLY FOR DEBUG PURPOSES"""
+        print("Graph Nodes:")
+        for node in self.nodes:
+            print(f"  - {node.name} ({node.alias}) [{node.id}]")
+
+        print("\nGraph Edges:")
+        for edge in self.edges:
+            print(f"  - {edge.node_a.alias} --[{edge.name}]--> {edge.node_b.alias}")
