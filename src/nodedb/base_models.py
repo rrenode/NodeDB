@@ -24,7 +24,7 @@ class BaseModel(metaclass=OldVariableNamesMeta):
     def __setstate__(self, state: Dict[str, Any]):
         """
         When jsonpickle rehydrates us:
-        1. Rename any old → new keys
+        1. Rename any old -> new keys
         2. Assign via setattr so the AutoPropertiesMeta
            setters populate the private backing fields.
         """

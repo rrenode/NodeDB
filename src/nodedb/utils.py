@@ -26,7 +26,7 @@ class OldVariableNamesMeta(AutoPropertiesMeta):
         original_init = dct.get("__init__")
         old_map = dct.get("__old_mappings__", {})
 
-        # 1) Wrap __init__ to remap old-kwargs → new-attrs on construction
+        # 1) Wrap __init__ to remap old-kwargs -> new-attrs on construction
         def new_init(self, *args, **kwargs):
             extra: Dict[str, Any] = {}
             for old, new in old_map.items():

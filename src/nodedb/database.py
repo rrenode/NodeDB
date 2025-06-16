@@ -256,14 +256,20 @@ class Graph(BaseModel):
         # Read file as JSON dict
         raw_data = loads(filepath.read_text())
 
-        # Reverse the phase2 transformation
-        deserialized_data = deserialize_phase2(raw_data, type_overrides=type_overrides)
+        if "REGISTRY" in raw_data:
+            # Reverse the phase2 transformation
+            deserialized_data = deserialize_phase2(raw_data, type_overrides=type_overrides)
+            obj = jsonpickle.decode(dumps(deserialized_data))
+        else:
+            # Try to convert legacy structure to 2-phase
+            serialized = serialize_phase2(raw_data)
+            deserialized_data = deserialize_phase2(serialized, type_overrides=type_overrides)
+            obj = jsonpickle.decode(dumps(deserialized_data))
 
-        # Convert dict back to string → decode with jsonpickle
+        # Convert dict back to string -> decode with jsonpickle
         obj = jsonpickle.decode(dumps(deserialized_data))
         
         return obj
-
     
     # ─────────────────────────────────────────────
     # Debug / Introspection
