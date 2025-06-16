@@ -297,6 +297,13 @@ class Graph(BaseModel):
     # Debug / Introspection
     # ─────────────────────────────────────────────
     
+    def summary(self):
+        return {
+            "total_nodes": len(self.nodes),
+            "total_edges": len(self.edges),
+            "isolated_nodes": len([n for n in self.nodes if not self.get_edges_from(n) and not self.get_edges_to(n)])
+        }
+    
     def print_graph(self) -> None:
         """MOSTLY FOR DEBUG PURPOSES"""
         print("Graph Nodes:")
