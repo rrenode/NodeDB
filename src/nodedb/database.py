@@ -287,9 +287,25 @@ class Graph(BaseModel):
     def csv_nodes(self) -> tuple[list[list], list[str]]:
         return self._nodes_to_csv(self.nodes)
 
-    def save(self, filepath: str) -> None:
-        with open(filepath, "w") as f:
-            f.write(jsonpickle.encode(self))
+    def save(self, filepath: str | Path) -> None:
+        filepath = Path(filepath)
+
+        # Prevent writing to a directory
+        if filepath.exists() and filepath.is_dir():
+            raise ValueError(f"Refusing to save to directory: {filepath}")
+
+        # Ensure parent directories exist
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+
+        # Encode graph
+        data = jsonpickle.encode(self, make_refs=False)
+
+        # Defensive check
+        if not data or data.strip() == "{}":
+            raise ValueError("Refusing to save empty or malformed graph data")
+
+        # Write to file
+        filepath.write_text(data)
     
     @staticmethod
     def load(filepath: str) -> 'Graph':
