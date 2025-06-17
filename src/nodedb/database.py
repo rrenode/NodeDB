@@ -9,6 +9,7 @@ from pathlib import Path
 from uuid import UUID
 
 from .base_models import Node, Edge, BaseModel
+from .query import parse_expr, smart_tokenize
 from .jpickle_ex import deserialize_phase2, serialize_phase2
 
 class Graph(BaseModel):
@@ -165,23 +166,44 @@ class Graph(BaseModel):
     # Filtering / Querying
     # ─────────────────────────────────────────────
 
-    def filter_nodes_by_field(self, field: str, value: Any) -> tuple[list[list], list[str]]:
+    def filter_nodes_by_field(self, field: str, value: Any) -> list[Node]:
         if not all(hasattr(n, field) for n in self.nodes):
             raise AttributeError(f"Field '{field}' not found in Node")
-        return self._nodes_to_csv(
-            [n for n in self.nodes if getattr(n, field, None) == value]
-        )
+        return [n for n in self.nodes if getattr(n, field, None) == value]
 
     def find_nodes(self, fn: Callable[['Node'], bool]) -> tuple[list[list], list[str]]:
-        return self._nodes_to_csv(
-            [n for n in self.nodes if fn(n)]
-        )
+        return [n for n in self.nodes if fn(n)]
 
     def find_nodes_by_regex(self, field: str, pattern: str) -> tuple[list[list], list[str]]:
         regex = re.compile(pattern)
-        return self._nodes_to_csv(
-            [n for n in self.nodes if regex.search(str(getattr(n, field, "")))]
-        )
+        return [n for n in self.nodes if regex.search(str(getattr(n, field, "")))]
+
+    def find_nodes_by_query(self, query: str) -> list[Node]:
+        tokens = smart_tokenize(query)
+        ast, i = parse_expr(tokens)
+        if i != len(tokens):
+            raise SyntaxError(f"Unexpected trailing tokens: {tokens[i:]}")
+        return [n for n in self.nodes if self._evaluate_ast(ast, n)]
+
+    def _evaluate_ast(self, ast, node) -> bool:
+        if isinstance(ast, tuple):
+            tag = ast[0]
+            if tag == 'MATCH':
+                field, op, pattern = ast[1], ast[2], ast[3]
+                value = getattr(node, field, None)
+                if value is None:
+                    return False
+                value = str(value)
+
+                try:
+                    if op == '=':
+                        return re.search(pattern, value) is not None
+                    elif op == '!=':
+                        return re.search(pattern, value) is None
+                    else:
+                        raise ValueError(f"Unknown operator: {op}")
+                except re.error as e:
+                    raise ValueError(f"Invalid regex: {pattern!r} ({e})")
 
     def sort_nodes_by(
         self, field: str, limit: int = None, offset: int = 0
@@ -192,7 +214,7 @@ class Graph(BaseModel):
         sorted_nodes = sorted(self.nodes, key=lambda n: getattr(n, field, ""))
         paged_nodes = sorted_nodes[offset: offset + limit if limit is not None else None]
 
-        return self._nodes_to_csv(paged_nodes)
+        return paged_nodes
 
     # ─────────────────────────────────────────────
     # Exporting / Serialization
