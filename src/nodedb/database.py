@@ -19,7 +19,7 @@ class Graph(BaseModel):
     # Initialization
     # ─────────────────────────────────────────────
     
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.nodes: list[Node] = []
         self.edges: list[Edge] = []
 
@@ -259,15 +259,12 @@ class Graph(BaseModel):
         if "REGISTRY" in raw_data:
             # Reverse the phase2 transformation
             deserialized_data = deserialize_phase2(raw_data, type_overrides=type_overrides)
-            obj = jsonpickle.decode(dumps(deserialized_data))
+            obj = jsonpickle.decode(dumps(deserialized_data), keys=True)
         else:
             # Try to convert legacy structure to 2-phase
             serialized = serialize_phase2(raw_data)
             deserialized_data = deserialize_phase2(serialized, type_overrides=type_overrides)
-            obj = jsonpickle.decode(dumps(deserialized_data))
-
-        # Convert dict back to string -> decode with jsonpickle
-        obj = jsonpickle.decode(dumps(deserialized_data))
+            obj = jsonpickle.decode(dumps(deserialized_data), keys=True)
         
         return obj
     

@@ -2,6 +2,8 @@
 import gc
 import sys
 import inspect
+import importlib
+import warnings
 
 from typing import Any, Dict, Type
 from functools import lru_cache
@@ -148,22 +150,17 @@ def recurse_json(obj, callback):
     Recursively walk a JSON-like structure, applying `callback` to every dict.
     """
     if isinstance(obj, dict):
-        result = callback(obj)
-
-        # If callback changed the object to something non-dict, stop recursion
-        if not isinstance(result, dict):
-            return result
-
-        for key in list(result.keys()):
-            result[key] = recurse_json(result[key], callback)
-        return result
+        # First recurse into all values
+        result = {}
+        for key, value in obj.items():
+            result[key] = recurse_json(value, callback)
+        return callback(result)  # Apply after recursion
 
     elif isinstance(obj, list):
         return [recurse_json(item, callback) for item in obj]
 
     else:
-        # Primitive (str, int, None, etc.) – return as-is
-        return obj
+        return obj  # primitive
 
 def get_all_loaded_classes(clear_cache=False):
     if clear_cache:
@@ -235,3 +232,21 @@ def get_all_subclasses_of(base_cls: Type) -> Dict[str, Type]:
         for path, cls in all_classes.items()
         if inspect.isclass(cls) and issubclass(cls, base_cls) and cls is not base_cls
     }
+
+def validate_type_overrides(type_overrides: dict[str, str], strict=True) -> None:
+    for original, new_path in type_overrides.items():
+        try:
+            module_path, _, class_name = new_path.rpartition(".")
+            module = importlib.import_module(module_path)
+            if not hasattr(module, class_name):
+                msg = f"Class '{class_name}' not found in module '{module_path}'"
+                if strict:
+                    raise AttributeError(msg)
+                else:
+                    warnings.warn(msg)
+        except Exception as e:
+            msg = f"Invalid type override: '{original}' -> '{new_path}'\n  {type(e).__name__}: {e}"
+            if strict:
+                raise ImportError(msg) from e
+            else:
+                warnings.warn(msg)
