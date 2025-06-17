@@ -132,7 +132,7 @@ def serialize_phase2(data):
                 else:
                     model_type = BaseModelTypes.NODE  # default fallback
             else:
-                print(f"[WARN] Could not resolve class for: {original}")
+                warnings.warn(f"Could not resolve class for: {original}")
                 model_type = BaseModelTypes.NODE  # fallback to something safe
 
             uid = "EXTRACT_" + str(uuid4())
