@@ -77,7 +77,7 @@ class Graph(BaseModel):
                 return node
         return possible_nodes
     
-    def match_closest_node_alias(self, alias: str) -> Optional[Node]:
+    def match_closest_node_alias(self, alias: str, match_cutoff: float = 0.7) -> Optional[Node]:
         possible_node = self.get_closest_nodes_alias(alias)
         if isinstance(possible_node, Node):
             if possible_node.alias == alias:
@@ -92,7 +92,10 @@ class Graph(BaseModel):
                 highest_similarity = similarity
                 best_match = node
 
-        return best_match
+        if highest_similarity >= match_cutoff:
+            return best_match
+        else:
+            return None
     
     def get_closest_nodes_name(self, node_name: str) -> Optional[Node]:
         possible_nodes = []
@@ -103,7 +106,7 @@ class Graph(BaseModel):
                 return node
         return possible_nodes
         
-    def match_closest_node_name(self, node_name: str) -> Optional[Node]:
+    def match_closest_node_name(self, node_name: str, match_cutoff: float = 0.7) -> Optional[Node]:
         # First check for exact match
         for node in self.nodes:
             if node_name == node.name:
@@ -119,9 +122,12 @@ class Graph(BaseModel):
                 highest_similarity = similarity
                 best_match = node
 
-        return best_match
+        if highest_similarity >= match_cutoff:
+            return best_match
+        else:
+            return None
 
-    def match_closest_node_id(self, node_id: str) -> Optional[Node]:
+    def match_closest_node_id(self, node_id: str, match_cutoff: float = 0.7) -> Optional[Node]:
         # Exact match
         for node in self.nodes:
             if node.id == node_id:
@@ -142,7 +148,10 @@ class Graph(BaseModel):
                 highest_similarity = similarity
                 best_match = node
 
-        return best_match
+        if highest_similarity >= match_cutoff:
+            return best_match
+        else:
+            return None
 
     # ─────────────────────────────────────────────
     # Graph Relationships
