@@ -239,15 +239,13 @@ class Graph(BaseModel):
     def csv_nodes(self) -> tuple[list[list], list[str]]:
         return self._nodes_to_csv(self.nodes)
 
-    def save(self, filepath: str | Path, bypass_empty_nodes_error=False) -> None:
+    def save(self, filepath: str | Path, raise_empty_nodes_error=False) -> None:
         from json import loads, dumps
 
         if all(isinstance(x, dict) and not x for x in self.nodes):
             msg = "Node data is likely malformed as the nodes list contains only empty dicts."
-            if bypass_empty_nodes_error:
-                warnings.warn(msg)
-            else:
-                raise(msg + "\n" + "You can pass `bypass_empty_nodes_error=True` to raise a warning instead of an error.")
+            if raise_empty_nodes_error:
+                raise(msg)
 
         # Clean node data
         for i in reversed(range(len(self.nodes))):
