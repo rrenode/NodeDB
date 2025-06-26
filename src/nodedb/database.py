@@ -197,6 +197,7 @@ class Graph(BaseModel):
     def _evaluate_ast(self, ast, node) -> bool:
         if isinstance(ast, tuple):
             tag = ast[0]
+
             if tag == 'MATCH':
                 field, op, pattern = ast[1], ast[2], ast[3]
                 value = getattr(node, field, None)
@@ -213,6 +214,19 @@ class Graph(BaseModel):
                         raise ValueError(f"Unknown operator: {op}")
                 except re.error as e:
                     raise ValueError(f"Invalid regex: {pattern!r} ({e})")
+
+            elif tag == 'or':
+                left = self._evaluate_ast(ast[1], node)
+                right = self._evaluate_ast(ast[2], node)
+                return left or right
+
+            elif tag == 'and':
+                left = self._evaluate_ast(ast[1], node)
+                right = self._evaluate_ast(ast[2], node)
+                return left and right
+
+        return False
+
 
     def sort_nodes_by(
         self, field: str, limit: int = None, offset: int = 0
