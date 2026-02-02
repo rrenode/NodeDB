@@ -1,3 +1,12 @@
+This was an earnest (and, in hindsight, slightly laughable) attempt at building a graph database. I learned a lot along the way.
+
+Sadly, the journey docs didn’t survive an accident, so this repo lives on as an archive of where I was at the time.
+
+Here for archive of my past. 
+
+### Old README.rst below
+____
+
 .. These are examples of badges you might want to add to your README:
    please update the URLs accordingly
 
